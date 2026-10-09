@@ -42,4 +42,59 @@ The fourth output is the year-on-year change and materiality assessment in the `
 
 ---
 
-There are three points to check before this goes in the report. First, I've described the B57:J66 block as "the matrix taken from `SAA Model`" rather than as a covariance matrix. You've confirmed it holds correlations, while the instructions call it a covariance matrix, so whether the tracking-error test scales it correctly belongs in your findings rather than in this descriptive section. Second, the step from composite weights to index-level allocation through 'AssetClassMap' is my reading of why the weights are pasted into `SAA Output`, so please confirm it with the model owner. Third, the macro settings and file references come from the instructions document, which you've noted differs from the model version you hold, so it's worth checking them against the current build.
+
+**X.X Historic Simulation and Forward Projections**
+
+**X.X.1 Overview**
+
+After optimisation, each strategy's asset allocation is assessed in two complementary ways. A historic simulation back-tests the optimised weights against realised market data. A forward projection, a Monte Carlo simulation, characterises the distribution of future outcomes implied by the forward-looking capital market assumptions. Both are executed within the 'SAA Model.xlsm' workbook for one strategy at a time and repeated for each of the ten strategies.
+
+The optimisation step (RISKOptimizer) is treated as a black box for the purposes of this section. Its outputs, the composite weights for each strategy, are the inputs to the processes described below.
+
+**X.X.2 Execution**
+
+Following optimisation of all strategies, the model owner sets the run mode in cell C3 of the 'MonteCarloModel' sheet to 'Simulation', selects the strategy in cell C5 and runs @Risk with 10,000 iterations and a single simulation. The historic simulation and export are then triggered from the 'Summary' sheet using the 'Update Historic Simulation' and 'Export Output' buttons. The sequence is repeated for each strategy, and the workbook is saved as 'SAA Unconstrained Model'.
+
+**X.X.3 Forward projections (Monte Carlo simulation)**
+
+The forward projection is performed in @Risk using worksheet formulas on the 'MonteCarloModel' sheet. The simulation uses the following inputs, transferred manually from 'SAA Input Data.xlsm':
+
+- expected returns (E48:E55)
+- expected volatilities (F48:F55)
+- expected yields (G48:G55)
+- the composite correlation matrix (C70:J77)
+
+These cover the seven composites plus inflation. Each iteration projects portfolio values over a 20-year horizon from a notional starting value of 2. This value is a convention adopted by the developers and does not represent a realistic portfolio size. Because all reported characteristics are expressed in return terms, they are not affected by the starting value. The terminal portfolio value at year 20 (cell W97) appears to be the value the optimiser maximises.
+
+According to the vendor documentation, @Risk applies Spearman rank correlations through a distribution-free rank-order pairing method. The marginal distributions assumed for each composite were not documented by the model owner and have not been independently confirmed. The simulation engine is therefore treated as a vendor component, and its outputs are reviewed rather than its internal mechanics.
+
+**X.X.4 Historic simulation (back-test)**
+
+The historic simulation is implemented in VBA (module 'ModHistoricSimulation'). It applies the strategy's optimised composite weights to realised monthly composite returns, sourced from 'SAA Input Data.xlsm', over a fixed 20-year window. The procedure runs as follows:
+
+1. **Data preparation.** The macro loads composite returns, sub-index returns, composite yields and composite weights. It truncates the series to 240 monthly observations and checks that the dates span exactly 20 years.
+2. **Proxying of short histories.** Where a composite lacks returns at the start of the window, the macro rebuilds it from the constituent sub-indices that have sufficient history. The available weights are re-scaled pro rata, allowed to drift monthly, and reset to target each December.
+3. **Portfolio simulation.** The notional starting value from the 'MonteCarloModel' sheet is allocated to composites according to the strategy weights. Each holding compounds at its realised monthly return, with weights drifting intra-year and rebalanced to target at each December year-end. Portfolio yield is calculated monthly as the value-weighted average of composite yields.
+4. **Statistics.** Return, risk, drawdown and distributional statistics are calculated from the monthly portfolio value series and written to the 'HistoricSimulation' sheet.
+
+The historic simulation uses realised returns only. It is independent of the forward-looking expected returns and therefore provides an out-of-model view of how the allocation would have performed historically.
+
+**X.X.5 Export and final outputs**
+
+The 'Export Output' macro (module 'ModExport') writes three blocks to the strategy-specific sheet of 'SAA Output.xlsm', overwriting the previous contents:
+
+- the set-up parameters (composite weights, expected returns, volatilities, yields and correlation matrix)
+- the Monte Carlo results
+- the historic simulation results
+
+These populate the 'Summary' tab of 'SAA Output.xlsm', which forms the final model output. For each strategy, the 'Summary' tab reports the allocation at both composite and individual index level, together with the following characteristics.
+
+| Output | Source | Characteristics reported |
+|---|---|---|
+| Strategic asset allocation | RISKOptimizer, with within-composite weights from 'Composite Weights.xlsx' | Weight per composite and weight per individual index |
+| Historic Characteristics | Historic simulation (20 years, realised data) | Annualised return; annualised excess over cash; annualised excess over inflation; maximum and minimum 12-month return; annualised volatility; maximum drawdown with peak and trough dates; months to recover; average gross yield |
+| Projected Characteristics | Monte Carlo simulation (10,000 iterations, 20-year horizon) | Mean annualised return, with the 90% and 10% probability outcomes; mean excess over cash and over inflation; mean volatility; mean minimum 12-month return; maximum drawdown (mean and 10% probability); current gross yield |
+
+The 'HistoricSimulation' sheet also calculates downside volatility, skewness, kurtosis and the Sharpe, Sortino, Calmar and adjusted Sharpe ratios. These are not reported on the 'Summary' tab.
+
+The 'Change' tab compares the current-year allocations with the prior year. The 'Materiality' tab tests whether proposed changes exceed the materiality threshold, using an absolute sum of changes and a tracking-error approach. For strategies that do not breach the threshold, the prior-year allocation is reinstated and the simulation stage is re-run. That re-run produces the final 'SAA Model' and 'SAA Output' files, which constitute the approved strategic asset allocation and its reported characteristics for the year.
