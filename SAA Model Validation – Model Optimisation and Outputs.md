@@ -87,3 +87,33 @@ The historic and projected characteristics describe each strategy along the same
 The historic characteristics are a single realised outcome, while the projected characteristics are averages and percentiles across 10,000 scenarios. Differences between them, for example a deeper historic drawdown than the projected mean, reflect both the assumptions of the projection and the particular events in the back-test window, as discussed above.
 
 Together, these outputs show whether each strategy's risk and return profile is consistent with its intended position on the risk ladder, and they support the communication of the SAA to the wider investment team.
+
+### Validation Assessment
+
+The optimisation and simulation steps of the SAA model are run within Palisade @RISK and its RISKOptimizer module, a third-party Excel add-in. UKRM does not have access to a licensed installation of the add-in. As a result, UKRM could not independently run the optimisation and simulation steps in the Model Owner's workbooks, or reproduce the optimal weights and the projected characteristics reported by the model.
+
+UKRM's assessment of these steps is therefore based on a desk-based review of three sources:
+
+- the MO's instructions document, including the optimiser set-up, constraint definitions, penalty functions and runtime settings shown in it;
+- the structure of the workbooks;
+- the VBA macros in the SAA Model workbook.
+
+The review of the macros is a static code review. The logic was read and assessed line by line, but the code was not executed. Any observations on the macros, including those raised in the Model Implementation section, have therefore not been confirmed by running the code and should be validated with the MO.
+
+The lack of access also limited the scope of the independent testing. In particular, UKRM was not able to:
+
+- reproduce the MO's results for any strategy, or confirm that the reported weights are the output of the documented set-up;
+- assess how sensitive the results are to changes in the volatility targets, the composite bounds, the minimum yield or the penalty functions;
+- test alternative strategies or constraint sets beyond those run by the MO;
+- assess the stability and convergence of the optimiser across repeated runs, random seeds, starting points or numbers of iterations;
+- verify how @RISK applies the correlation matrix and what marginal distributions it uses, beyond what is stated in the vendor documentation.
+
+UKRM's independent challenger implementation partly mitigates this limitation. It replicates the optimisation and simulation approach outside @RISK and compares it with an exact solution of the same problem, as described in the challenger section of this report. However, the challenger is an approximation of the vendor tool, not a re-run of it. It cannot confirm the behaviour of RISKOptimizer itself, and differences between the challenger and the model's outputs cannot be fully attributed without access to the original environment.
+
+UKRM considers this a limitation on the scope of the validation, which should be recorded as such. Consistent with the expectation that third-party models and tools are subject to the same standards as internally developed ones, the MO should address it through one of the following routes:
+
+- give UKRM access to a licensed installation, or arrange a supervised run in which UKRM specifies the scenarios to be executed;
+- provide execution evidence for each annual run, including the optimiser settings, random seed, run logs and full outputs for each strategy;
+- obtain and retain vendor documentation and evidence of testing for the @RISK functionality the model relies on.
+
+Until one of these is in place, the conclusions of this report on the optimisation and simulation steps rest on review of the documentation and code, and on the challenger, rather than on independent execution.
